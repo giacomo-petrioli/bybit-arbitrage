@@ -24,7 +24,7 @@ class BybitArbitrageMonitor:
         self.api_key = "aEBgsji7cAQpYh6mjE"
         self.api_secret = "uyzsvDojsHiEnc2V55U12ZyIRxKh2ATuWLxf"
         
-        self.quote_currencies = ['USDT', 'EUR', 'BTC', 'ETH', 'USDC']
+        self.quote_currencies = ['USDT', 'EUR', 'BTC', 'ETH', 'USDC', 'USDE', 'BRL', 'PLN', 'TRY']
 
     def get_tickers(self) -> Optional[Dict]:
         try:
