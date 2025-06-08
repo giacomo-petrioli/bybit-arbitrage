@@ -9,9 +9,6 @@ import hmac
 import hashlib
 import time
 
-# Configurazione logging
-logging.basicConfig(level=logging.INFO)
-
 app = Flask(__name__)
 
 class BybitArbitrageMonitor:
@@ -28,15 +25,6 @@ class BybitArbitrageMonitor:
         self.api_secret = "uyzsvDojsHiEnc2V55U12ZyIRxKh2ATuWLxf"
         
         self.quote_currencies = ['USDT', 'EUR', 'BTC', 'ETH', 'USDC']
-
-    def generate_signature(self, params: dict) -> str:
-        """Genera la firma HMAC SHA256"""
-        param_str = '&'.join([f"{k}={params[k]}" for k in sorted(params)])
-        return hmac.new(
-            bytes(self.api_secret, 'utf-8'),
-            bytes(param_str, 'utf-8'),
-            hashlib.sha256
-        ).hexdigest()
 
     def get_tickers(self) -> Optional[Dict]:
         try:
