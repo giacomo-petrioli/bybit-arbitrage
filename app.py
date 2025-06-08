@@ -4,6 +4,10 @@ import json
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 import logging
+import os
+import hmac
+import hashlib
+import time
 
 # Configurazione logging
 logging.basicConfig(level=logging.INFO)
@@ -19,13 +23,31 @@ class BybitArbitrageMonitor:
             'User-Agent': 'ArbitrageBot/1.0'
         })
         
-        self.quote_currencies = ['USDT', 'EUR', 'BTC', 'ETH', 'USDC']
+        # Carica API Key e Secret da environment variables (Vercel)
+        self.api_key = "aEBgsji7cAQpYh6mjE
+        self.api_secret = "uyzsvDojsHiEnc2V55U12ZyIRxKh2ATuWLxf
         
+        self.quote_currencies = ['USDT', 'EUR', 'BTC', 'ETH', 'USDC']
+
+    def generate_signature(self, params: dict) -> str:
+        """Genera la firma HMAC SHA256"""
+        param_str = '&'.join([f"{k}={params[k]}" for k in sorted(params)])
+        return hmac.new(
+            bytes(self.api_secret, 'utf-8'),
+            bytes(param_str, 'utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+
     def get_tickers(self) -> Optional[Dict]:
-        """Ottiene tutti i ticker da Bybit"""
+        """Ottiene tutti i ticker da Bybit con autenticazione"""
         try:
             url = f"{self.base_url}/v5/market/tickers"
-            params = {'category': 'spot'}
+            params = {
+                'category': 'spot',
+                'api_key': self.api_key,
+                'timestamp': str(int(time.time() * 1000))
+            }
+            params['sign'] = self.generate_signature(params)
             
             response = self.session.get(url, params=params, timeout=10)
             response.raise_for_status()
