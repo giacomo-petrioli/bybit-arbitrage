@@ -1,19 +1,14 @@
 from flask import Flask, render_template, jsonify, request
-from flask_socketio import SocketIO, emit
 import requests
 import json
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 import logging
-import threading
-import time
 
 # Configurazione logging
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'arbitrage_secret_key_2024'
-socketio = SocketIO(app, cors_allowed_origins="*")
 
 class BybitArbitrageMonitor:
     def __init__(self, min_spread_percent: float = 1.0):
@@ -25,10 +20,6 @@ class BybitArbitrageMonitor:
         })
         
         self.quote_currencies = ['USDT', 'EUR', 'BTC', 'ETH', 'USDC']
-        self.alert_cache = {}
-        self.cache_duration = 300
-        self.auto_monitor_active = False
-        self.monitor_thread = None
         
     def get_tickers(self) -> Optional[Dict]:
         """Ottiene tutti i ticker da Bybit"""
@@ -161,34 +152,7 @@ class BybitArbitrageMonitor:
         grouped_data = self.group_by_base_currency(tickers)
         opportunities = self.calculate_arbitrage_opportunities(grouped_data)
         
-        return opportunities[:20]  # Restituisce top 20
-    
-    def start_auto_monitor(self):
-        """Avvia il monitoraggio automatico"""
-        self.auto_monitor_active = True
-        if self.monitor_thread is None or not self.monitor_thread.is_alive():
-            self.monitor_thread = threading.Thread(target=self._auto_monitor_loop)
-            self.monitor_thread.daemon = True
-            self.monitor_thread.start()
-    
-    def stop_auto_monitor(self):
-        """Ferma il monitoraggio automatico"""
-        self.auto_monitor_active = False
-    
-    def _auto_monitor_loop(self):
-        """Loop per il monitoraggio automatico"""
-        while self.auto_monitor_active:
-            try:
-                opportunities = self.scan_opportunities()
-                socketio.emit('new_opportunities', {
-                    'opportunities': opportunities,
-                    'timestamp': datetime.now().strftime("%H:%M:%S"),
-                    'count': len(opportunities)
-                })
-                time.sleep(30)  # 30 secondi
-            except Exception as e:
-                logging.error(f"Errore nel monitoraggio automatico: {e}")
-                time.sleep(30)
+        return opportunities[:20]
 
 # Istanza globale del monitor
 monitor = BybitArbitrageMonitor(min_spread_percent=1.0)
@@ -197,7 +161,7 @@ monitor = BybitArbitrageMonitor(min_spread_percent=1.0)
 def index():
     return render_template('index.html')
 
-@app.route('/api/scan', methods=['POST'])
+@app.route('/api/scan', methods=['POST', 'GET'])
 def scan_once():
     """API per scansione singola"""
     try:
@@ -214,45 +178,6 @@ def scan_once():
             'error': str(e)
         }), 500
 
-@app.route('/api/auto-monitor', methods=['POST'])
-def toggle_auto_monitor():
-    """API per attivare/disattivare monitoraggio automatico"""
-    try:
-        action = request.json.get('action')
-        
-        if action == 'start':
-            monitor.start_auto_monitor()
-            return jsonify({
-                'success': True,
-                'status': 'started',
-                'message': 'Monitoraggio automatico avviato'
-            })
-        elif action == 'stop':
-            monitor.stop_auto_monitor()
-            return jsonify({
-                'success': True,
-                'status': 'stopped',
-                'message': 'Monitoraggio automatico fermato'
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': 'Azione non valida'
-            }), 400
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@socketio.on('connect')
-def handle_connect():
-    emit('connected', {'message': 'Connesso al server di monitoraggio'})
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    print('Client disconnesso')
-
+# Per Vercel, l'app deve essere accessibile come variabile globale
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True)
