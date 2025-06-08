@@ -39,32 +39,25 @@ class BybitArbitrageMonitor:
         ).hexdigest()
 
     def get_tickers(self) -> Optional[Dict]:
-        """Ottiene tutti i ticker da Bybit con autenticazione"""
-        try:
-            url = f"{self.base_url}/v5/market/tickers"
-            params = {
-                'category': 'spot',
-                'api_key': self.api_key,
-                'timestamp': str(int(time.time() * 1000))
-            }
-            params['sign'] = self.generate_signature(params)
-            
-            response = self.session.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            
-            data = response.json()
-            if data['retCode'] == 0:
-                return data['result']['list']
-            else:
-                logging.error(f"Errore API Bybit: {data['retMsg']}")
-                return None
+    """Ottiene tutti i ticker da Bybit (no auth)"""
+    try:
+        url = f"{self.base_url}/v5/market/tickers"
+        params = {'category': 'spot'}
+        response = self.session.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        if data['retCode'] == 0:
+            return data['result']['list']
+        else:
+            logging.error(f"Errore API Bybit: {data['retMsg']}")
+            return None
                 
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Errore nella richiesta API: {e}")
-            return None
-        except json.JSONDecodeError as e:
-            logging.error(f"Errore nel parsing JSON: {e}")
-            return None
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Errore nella richiesta API: {e}")
+        return None
+    except json.JSONDecodeError as e:
+        logging.error(f"Errore nel parsing JSON: {e}")
+        return None
             
     def parse_symbol(self, symbol: str) -> Tuple[str, str]:
         """Estrae base e quote currency dal simbolo"""
