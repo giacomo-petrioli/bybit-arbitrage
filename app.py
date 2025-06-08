@@ -24,8 +24,8 @@ class BybitArbitrageMonitor:
         })
         
         # Carica API Key e Secret da environment variables (Vercel)
-        self.api_key = "aEBgsji7cAQpYh6mjE
-        self.api_secret = "uyzsvDojsHiEnc2V55U12ZyIRxKh2ATuWLxf
+        self.api_key = "aEBgsji7cAQpYh6mjE"
+        self.api_secret = "uyzsvDojsHiEnc2V55U12ZyIRxKh2ATuWLxf"
         
         self.quote_currencies = ['USDT', 'EUR', 'BTC', 'ETH', 'USDC']
 
