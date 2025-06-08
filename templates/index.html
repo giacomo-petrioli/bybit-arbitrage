@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔥 Crypto Arbitrage Monitor - Bybit</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #FF6B6B, #FF8E53);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #4ECDC4, #44A08D);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(78, 205, 196, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #FF5722, #E91E63);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(255, 87, 34, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .status-bar {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .status-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .status-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #FFD700;
+        }
+
+        .status-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
+        .opportunities {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .opportunities h2 {
+            margin-bottom: 25px;
+            text-align: center;
+            font-size: 1.8rem;
+            color: #FFD700;
+        }
+
+        .opportunity-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .opportunity-card:hover {
+            transform: translateX(10px);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .opportunity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .currency-name {
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+
+        .spread-badge {
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .opportunity-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .trade-action {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .trade-buy {
+            background: rgba(76, 175, 80, 0.2);
+        }
+
+        .trade-sell {
+            background: rgba(244, 67, 54, 0.2);
+        }
+
+        .trade-label {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .trade-pair {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .trade-price {
+            font-size: 0.9rem;
+            font-family: 'Courier New', monospace;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2rem;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #FFD700;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 15px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .auto-monitor-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(76, 175, 80, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            display: none;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .no-opportunities {
+            text-align: center;
+            padding: 40px;
+            opacity: 0.7;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .opportunity-header {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔥 Crypto Arbitrage Monitor</h1>
+            <p>Monitora opportunità di arbitraggio in tempo reale su Bybit</p>
+        </div>
+
+        <div class="controls">
+            <button id="scanBtn" class="btn btn-primary">
+                <span>🔍</span>
+                Scansiona Ora
+            </button>
+            <button id="autoBtn" class="btn btn-success">
+                <span>🔄</span>
+                Avvia Auto-Scan
+            </button>
+            <button id="stopBtn" class="btn btn-danger" style="display: none;">
+                <span>⏹️</span>
+                Ferma Auto-Scan
+            </button>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-value" id="opportunityCount">0</div>
+                <div class="status-label">Opportunità Trovate</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="lastUpdate">--:--:--</div>
+                <div class="status-label">Ultimo Aggiornamento</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="bestSpread">0.00%</div>
+                <div class="status-label">Miglior Spread</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="autoStatus">OFF</div>
+                <div class="status-label">Auto-Monitor</div>
+            </div>
+        </div>
+
+        <div class="opportunities">
+            <h2>📊 Opportunità di Arbitraggio</h2>
+            <div id="opportunitiesList">
+                <div class="no-opportunities">
+                    <p>Clicca su "Scansiona Ora" per cercare opportunità di arbitraggio</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="autoIndicator" class="auto-monitor-indicator">
+        🔄 AUTO-SCAN ATTIVO
+    </div>
+
+    <script>
+        // Inizializzazione Socket.IO
+        const socket = io();
+        
+        // Elementi DOM
+        const scanBtn = document.getElementById('scanBtn');
+        const autoBtn = document.getElementById('autoBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const opportunitiesList = document.getElementById('opportunitiesList');
+        const opportunityCount = document.getElementById('opportunityCount');
+        const lastUpdate = document.getElementById('lastUpdate');
+        const bestSpread = document.getElementById('bestSpread');
+        const autoStatus = document.getElementById('autoStatus');
+        const autoIndicator = document.getElementById('autoIndicator');
+        
+        // Stato dell'applicazione
+        let isAutoMonitoring = false;
+        let isScanning = false;
+        
+        // Event listeners
+        scanBtn.addEventListener('click', scanOnce);
+        autoBtn.addEventListener('click', startAutoMonitor);
+        stopBtn.addEventListener('click', stopAutoMonitor);
+        
+        // Socket events
+        socket.on('connected', (data) => {
+            console.log('Connesso:', data.message);
+        });
+        
+        socket.on('new_opportunities', (data) => {
+            updateOpportunities(data.opportunities, data.timestamp);
+            updateStats(data.opportunities, data.timestamp);
+        });
+        
+        // Funzioni
+        async function scanOnce() {
+            if (isScanning) return;
+            
+            isScanning = true;
+            scanBtn.disabled = true;
+            scanBtn.innerHTML = '<div class="spinner"></div>Scansionando...';
+            
+            try {
+                const response = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateOpportunities(data.opportunities, data.timestamp);
+                    updateStats(data.opportunities, data.timestamp);
+                } else {
+                    alert('Errore durante la scansione: ' + data.error);
+                }
+            } catch (error) {
+                alert('Errore di connessione: ' + error.message);
+            } finally {
+                isScanning = false;
+                scanBtn.disabled = false;
+                scanBtn.innerHTML = '<span>🔍</span>Scansiona Ora';
+            }
+        }
+        
+        async function startAutoMonitor() {
+            try {
+                const response = await fetch('/api/auto-monitor', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ action: 'start' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    isAutoMonitoring = true;
+                    autoBtn.style.display = 'none';
+                    stopBtn.style.display = 'flex';
+                    autoStatus.textContent = 'ON';
+                    autoStatus.style.color = '#4ECDC4';
+                    autoIndicator.style.display = 'block';
+                } else {
+                    alert('Errore: ' + data.error);
+                }
+            } catch (error) {
+                alert('Errore di connessione: ' + error.message);
+            }
+        }
+        
+        async function stopAutoMonitor() {
+            try {
+                const response = await fetch('/api/auto-monitor', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ action: 'stop' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    isAutoMonitoring = false;
+                    autoBtn.style.display = 'flex';
+                    stopBtn.style.display = 'none';
+                    autoStatus.textContent = 'OFF';
+                    autoStatus.style.color = '#fff';
+                    autoIndicator.style.display = 'none';
+                } else {
+                    alert('Errore: ' + data.error);
+                }
+            } catch (error) {
+                alert('Errore di connessione: ' + error.message);
+            }
+        }
+        
+        function updateOpportunities(opportunities, timestamp) {
+            if (opportunities.length === 0) {
+                opportunitiesList.innerHTML = `
+                    <div class="no-opportunities">
+                        <p>Nessuna opportunità trovata con spread > 1%</p>
+                        <p style="font-size: 0.9rem; opacity: 0.7;">Ultimo controllo: ${timestamp}</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const html = opportunities.map(opp => {
+                const spreadColor = getSpreadColor(opp.spread_percent);
+                
+                return `
+                    <div class="opportunity-card" style="border-left-color: ${spreadColor};">
+                        <div class="opportunity-header">
+                            <div class="currency-name">${opp.base_currency}</div>
+                            <div class="spread-badge" style="background: ${spreadColor};">
+                                ${opp.spread_percent}%
+                            </div>
+                        </div>
+                        <div class="opportunity-details">
+                            <div class="trade-action trade-buy">
+                                <div class="trade-label">💰 Compra</div>
+                                <div class="trade-pair">${opp.buy_pair}</div>
+                                <div class="trade-price">$${opp.buy_price}</div>
+                            </div>
+                            <div class="trade-action trade-sell">
+                                <div class="trade-label">💸 Vendi</div>
+                                <div class="trade-pair">${opp.sell_pair}</div>
+                                <div class="trade-price">$${opp.sell_price}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            opportunitiesList.innerHTML = html;
+        }
+        
+        function updateStats(opportunities, timestamp) {
+            opportunityCount.textContent = opportunities.length;
+            lastUpdate.textContent = timestamp;
+            
+            if (opportunities.length > 0) {
+                const maxSpread = Math.max(...opportunities.map(o => o.spread_percent));
+                bestSpread.textContent = maxSpread.toFixed(2) + '%';
+            } else {
+                bestSpread.textContent = '0.00%';
+            }
+        }
+        
+        function getSpreadColor(spread) {
+            if (spread >= 5) return '#FF5722';      // Rosso per spread molto alti
+            if (spread >= 3) return '#FF9800';      // Arancione per spread alti
+            if (spread >= 2) return '#FFC107';      // Giallo per spread medi
+            return '#4CAF50';                       // Verde per spread bassi
+        }
+        
+        // Auto-refresh delle opportunità ogni 30 secondi se l'auto-monitor non è attivo
+        setInterval(() => {
+            if (!isAutoMonitoring && !isScanning) {
+                const now = new Date();
+                const lastUpdateTime = lastUpdate.textContent;
+                
+                if (lastUpdateTime !== '--:--:--') {
+                    // Aggiorna silenziosamente ogni 2 minuti se non ci sono scansioni attive
+                    const timeParts = lastUpdateTime.split(':');
+                    const lastTime = new Date();
+                    lastTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), parseInt(timeParts[2]));
+                    
+                    if (now - lastTime > 120000) { // 2 minuti
+                        scanOnce();
+                    }
+                }
+            }
+        }, 30000);
+        
+        // Messaggio di benvenuto
+        setTimeout(() => {
+            console.log('🔥 Crypto Arbitrage Monitor caricato!');
+            console.log('💡 Suggerimento: Attiva l\'Auto-Scan per monitoraggio continuo');
+        }, 1000);
+    </script>
+</body>
+</html>
