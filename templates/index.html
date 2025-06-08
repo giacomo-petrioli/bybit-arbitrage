@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🔥 Crypto Arbitrage Monitor - Bybit</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
             margin: 0;
@@ -94,16 +92,6 @@
         .btn-success:hover {
             transform: translateY(-3px);
             box-shadow: 0 8px 25px rgba(78, 205, 196, 0.4);
-        }
-
-        .btn-danger {
-            background: linear-gradient(45deg, #FF5722, #E91E63);
-            color: white;
-        }
-
-        .btn-danger:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(255, 87, 34, 0.4);
         }
 
         .btn:disabled {
@@ -254,29 +242,19 @@
             to { transform: rotate(360deg); }
         }
 
-        .auto-monitor-indicator {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(76, 175, 80, 0.9);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-weight: bold;
-            display: none;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
-
         .no-opportunities {
             text-align: center;
             padding: 40px;
             opacity: 0.7;
+        }
+
+        .auto-refresh-info {
+            background: rgba(78, 205, 196, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            border: 1px solid rgba(78, 205, 196, 0.3);
         }
 
         @media (max-width: 768px) {
@@ -322,14 +300,14 @@
                 <span>🔍</span>
                 Scansiona Ora
             </button>
-            <button id="autoBtn" class="btn btn-success">
+            <button id="autoRefreshBtn" class="btn btn-success">
                 <span>🔄</span>
-                Avvia Auto-Scan
+                <span id="autoRefreshText">Attiva Auto-Refresh</span>
             </button>
-            <button id="stopBtn" class="btn btn-danger" style="display: none;">
-                <span>⏹️</span>
-                Ferma Auto-Scan
-            </button>
+        </div>
+
+        <div id="autoRefreshInfo" class="auto-refresh-info" style="display: none;">
+            <p>🔄 Auto-refresh attivo - Prossima scansione tra <span id="countdown">30</span> secondi</p>
         </div>
 
         <div class="status-bar">
@@ -347,7 +325,7 @@
             </div>
             <div class="status-item">
                 <div class="status-value" id="autoStatus">OFF</div>
-                <div class="status-label">Auto-Monitor</div>
+                <div class="status-label">Auto-Refresh</div>
             </div>
         </div>
 
@@ -361,43 +339,29 @@
         </div>
     </div>
 
-    <div id="autoIndicator" class="auto-monitor-indicator">
-        🔄 AUTO-SCAN ATTIVO
-    </div>
-
     <script>
-        // Inizializzazione Socket.IO
-        const socket = io();
-        
         // Elementi DOM
         const scanBtn = document.getElementById('scanBtn');
-        const autoBtn = document.getElementById('autoBtn');
-        const stopBtn = document.getElementById('stopBtn');
+        const autoRefreshBtn = document.getElementById('autoRefreshBtn');
+        const autoRefreshText = document.getElementById('autoRefreshText');
+        const autoRefreshInfo = document.getElementById('autoRefreshInfo');
+        const countdown = document.getElementById('countdown');
         const opportunitiesList = document.getElementById('opportunitiesList');
         const opportunityCount = document.getElementById('opportunityCount');
         const lastUpdate = document.getElementById('lastUpdate');
         const bestSpread = document.getElementById('bestSpread');
         const autoStatus = document.getElementById('autoStatus');
-        const autoIndicator = document.getElementById('autoIndicator');
         
         // Stato dell'applicazione
-        let isAutoMonitoring = false;
+        let isAutoRefresh = false;
         let isScanning = false;
+        let autoRefreshInterval = null;
+        let countdownInterval = null;
+        let countdownValue = 30;
         
         // Event listeners
         scanBtn.addEventListener('click', scanOnce);
-        autoBtn.addEventListener('click', startAutoMonitor);
-        stopBtn.addEventListener('click', stopAutoMonitor);
-        
-        // Socket events
-        socket.on('connected', (data) => {
-            console.log('Connesso:', data.message);
-        });
-        
-        socket.on('new_opportunities', (data) => {
-            updateOpportunities(data.opportunities, data.timestamp);
-            updateStats(data.opportunities, data.timestamp);
-        });
+        autoRefreshBtn.addEventListener('click', toggleAutoRefresh);
         
         // Funzioni
         async function scanOnce() {
@@ -432,58 +396,70 @@
             }
         }
         
-        async function startAutoMonitor() {
-            try {
-                const response = await fetch('/api/auto-monitor', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ action: 'start' })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    isAutoMonitoring = true;
-                    autoBtn.style.display = 'none';
-                    stopBtn.style.display = 'flex';
-                    autoStatus.textContent = 'ON';
-                    autoStatus.style.color = '#4ECDC4';
-                    autoIndicator.style.display = 'block';
-                } else {
-                    alert('Errore: ' + data.error);
-                }
-            } catch (error) {
-                alert('Errore di connessione: ' + error.message);
+        function toggleAutoRefresh() {
+            if (isAutoRefresh) {
+                stopAutoRefresh();
+            } else {
+                startAutoRefresh();
             }
         }
         
-        async function stopAutoMonitor() {
-            try {
-                const response = await fetch('/api/auto-monitor', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ action: 'stop' })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    isAutoMonitoring = false;
-                    autoBtn.style.display = 'flex';
-                    stopBtn.style.display = 'none';
-                    autoStatus.textContent = 'OFF';
-                    autoStatus.style.color = '#fff';
-                    autoIndicator.style.display = 'none';
-                } else {
-                    alert('Errore: ' + data.error);
-                }
-            } catch (error) {
-                alert('Errore di connessione: ' + error.message);
+        function startAutoRefresh() {
+            isAutoRefresh = true;
+            autoRefreshText.textContent = 'Ferma Auto-Refresh';
+            autoRefreshBtn.className = 'btn btn-danger';
+            autoStatus.textContent = 'ON';
+            autoStatus.style.color = '#4ECDC4';
+            autoRefreshInfo.style.display = 'block';
+            
+            // Prima scansione immediata
+            scanOnce();
+            
+            // Avvia il countdown
+            startCountdown();
+            
+            // Avvia l'auto-refresh ogni 30 secondi
+            autoRefreshInterval = setInterval(() => {
+                scanOnce();
+                startCountdown();
+            }, 30000);
+        }
+        
+        function stopAutoRefresh() {
+            isAutoRefresh = false;
+            autoRefreshText.textContent = 'Attiva Auto-Refresh';
+            autoRefreshBtn.className = 'btn btn-success';
+            autoStatus.textContent = 'OFF';
+            autoStatus.style.color = '#fff';
+            autoRefreshInfo.style.display = 'none';
+            
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
             }
+            
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+        }
+        
+        function startCountdown() {
+            countdownValue = 30;
+            countdown.textContent = countdownValue;
+            
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
+            
+            countdownInterval = setInterval(() => {
+                countdownValue--;
+                countdown.textContent = countdownValue;
+                
+                if (countdownValue <= 0) {
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
         }
         
         function updateOpportunities(opportunities, timestamp) {
@@ -540,36 +516,15 @@
         }
         
         function getSpreadColor(spread) {
-            if (spread >= 5) return '#FF5722';      // Rosso per spread molto alti
-            if (spread >= 3) return '#FF9800';      // Arancione per spread alti
-            if (spread >= 2) return '#FFC107';      // Giallo per spread medi
-            return '#4CAF50';                       // Verde per spread bassi
+            if (spread >= 5) return '#FF5722';
+            if (spread >= 3) return '#FF9800';
+            if (spread >= 2) return '#FFC107';
+            return '#4CAF50';
         }
         
-        // Auto-refresh delle opportunità ogni 30 secondi se l'auto-monitor non è attivo
-        setInterval(() => {
-            if (!isAutoMonitoring && !isScanning) {
-                const now = new Date();
-                const lastUpdateTime = lastUpdate.textContent;
-                
-                if (lastUpdateTime !== '--:--:--') {
-                    // Aggiorna silenziosamente ogni 2 minuti se non ci sono scansioni attive
-                    const timeParts = lastUpdateTime.split(':');
-                    const lastTime = new Date();
-                    lastTime.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), parseInt(timeParts[2]));
-                    
-                    if (now - lastTime > 120000) { // 2 minuti
-                        scanOnce();
-                    }
-                }
-            }
-        }, 30000);
-        
         // Messaggio di benvenuto
-        setTimeout(() => {
-            console.log('🔥 Crypto Arbitrage Monitor caricato!');
-            console.log('💡 Suggerimento: Attiva l\'Auto-Scan per monitoraggio continuo');
-        }, 1000);
+        console.log('🔥 Crypto Arbitrage Monitor caricato!');
+        console.log('💡 Suggerimento: Attiva l\'Auto-Refresh per monitoraggio continuo');
     </script>
 </body>
 </html>
